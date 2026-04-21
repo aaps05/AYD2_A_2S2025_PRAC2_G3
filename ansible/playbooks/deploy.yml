@@ -1,0 +1,124 @@
+---
+# ─── Medical Services ─────────────────────────────────────────────────────────
+- name: Deploy Medical Services microservice
+  hosts: medical_services
+  become: yes
+
+  tasks:
+    - name: Authenticate Docker to ECR
+      shell: |
+        aws ecr get-login-password --region {{ aws_region }} | \
+        docker login --username AWS --password-stdin \
+        {{ ecr_medical_services_url | regex_replace('(/[^/]+)$', '') }}
+      environment:
+        AWS_DEFAULT_REGION: "{{ aws_region }}"
+
+    - name: Pull Medical Services image
+      community.docker.docker_image:
+        name: "{{ ecr_medical_services_url }}:latest"
+        source: pull
+        force_source: yes
+
+    - name: Stop and remove old container (if exists)
+      community.docker.docker_container:
+        name: medical-services
+        state: absent
+      ignore_errors: yes
+
+    - name: Run Medical Services container
+      community.docker.docker_container:
+        name: medical-services
+        image: "{{ ecr_medical_services_url }}:latest"
+        state: started
+        restart_policy: always
+        published_ports:
+          - "3001:3001"
+        env:
+          DB_HOST: "{{ medical_services_db_host }}"
+          DB_PORT: "5432"
+          DB_NAME: "medical_services"
+          DB_USER: "postgres"
+          DB_PASSWORD: "{{ db_password }}"
+          DB_SSL: "true"
+          PORT: "3001"
+
+# ─── Specialties ──────────────────────────────────────────────────────────────
+- name: Deploy Specialties microservice
+  hosts: specialties
+  become: yes
+
+  tasks:
+    - name: Authenticate Docker to ECR
+      shell: |
+        aws ecr get-login-password --region {{ aws_region }} | \
+        docker login --username AWS --password-stdin \
+        {{ ecr_specialties_url | regex_replace('(/[^/]+)$', '') }}
+      environment:
+        AWS_DEFAULT_REGION: "{{ aws_region }}"
+
+    - name: Pull Specialties image
+      community.docker.docker_image:
+        name: "{{ ecr_specialties_url }}:latest"
+        source: pull
+        force_source: yes
+
+    - name: Stop and remove old container (if exists)
+      community.docker.docker_container:
+        name: specialties
+        state: absent
+      ignore_errors: yes
+
+    - name: Run Specialties container
+      community.docker.docker_container:
+        name: specialties
+        image: "{{ ecr_specialties_url }}:latest"
+        state: started
+        restart_policy: always
+        published_ports:
+          - "3002:3002"
+        env:
+          DB_HOST: "{{ specialties_db_host }}"
+          DB_PORT: "5432"
+          DB_NAME: "specialties"
+          DB_USER: "postgres"
+          DB_PASSWORD: "{{ db_password }}"
+          DB_SSL: "true"
+          PORT: "3002"
+
+# ─── Frontend ─────────────────────────────────────────────────────────────────
+- name: Deploy Frontend
+  hosts: frontend
+  become: yes
+
+  tasks:
+    - name: Authenticate Docker to ECR
+      shell: |
+        aws ecr get-login-password --region {{ aws_region }} | \
+        docker login --username AWS --password-stdin \
+        {{ ecr_frontend_url | regex_replace('(/[^/]+)$', '') }}
+      environment:
+        AWS_DEFAULT_REGION: "{{ aws_region }}"
+
+    - name: Pull Frontend image
+      community.docker.docker_image:
+        name: "{{ ecr_frontend_url }}:latest"
+        source: pull
+        force_source: yes
+
+    - name: Stop and remove old container (if exists)
+      community.docker.docker_container:
+        name: frontend
+        state: absent
+      ignore_errors: yes
+
+    - name: Run Frontend container (nginx acts as API Gateway)
+      community.docker.docker_container:
+        name: frontend
+        image: "{{ ecr_frontend_url }}:latest"
+        state: started
+        restart_policy: always
+        published_ports:
+          - "80:80"
+        env:
+          MEDICAL_SERVICES_HOST: "{{ medical_services_private_ip }}"
+          SPECIALTIES_HOST: "{{ specialties_private_ip }}"

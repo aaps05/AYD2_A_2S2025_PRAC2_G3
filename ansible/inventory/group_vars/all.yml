@@ -1,0 +1,12 @@
+aws_region: "us-east-1"
+
+ecr_frontend_url: "585008074041.dkr.ecr.us-east-1.amazonaws.com/ayd-frontend"
+ecr_medical_services_url: "585008074041.dkr.ecr.us-east-1.amazonaws.com/ayd-medical-services"
+ecr_specialties_url: "585008074041.dkr.ecr.us-east-1.amazonaws.com/ayd-specialties"
+
+medical_services_db_host: "ayd-medical-db.cgv6ema86bn8.us-east-1.rds.amazonaws.com"
+specialties_db_host: "ayd-specialties-db.cgv6ema86bn8.us-east-1.rds.amazonaws.com"
+db_password: "AydMedico2025!"
+
+medical_services_private_ip: "10.0.1.152"
+specialties_private_ip: "10.0.1.129"

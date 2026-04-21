@@ -1,0 +1,23 @@
+# Node
+node_modules/
+.env
+npm-debug.log*
+
+# Terraform state and credentials
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+terraform/*.tfplan
+
+# Build output
+frontend/dist/
+
+# SSH keys
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
