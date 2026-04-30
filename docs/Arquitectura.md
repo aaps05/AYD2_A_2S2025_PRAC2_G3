@@ -5,93 +5,31 @@
 ---
 
 ## Diagrama General
-
-```
-                          INTERNET
-                             │
-                             ▼
-                    ┌────────────────┐
-                    │  AWS ALB       │  ← Acceso público HTTP:80
-                    │  (Load         │    DNS: ayd-alb-xxx.us-east-1.elb.amazonaws.com
-                    │   Balancer)    │
-                    └───────┬────────┘
-                            │
-              ┌─────────────┘
-              ▼
-    ┌─────────────────────┐       Elastic IP (estática)
-    │  EC2: Frontend      │◄──────────────────────────
-    │  (Ubuntu 22.04)     │
-    │  Docker Container:  │
-    │  nginx + Vue.js SPA │
-    │  Puerto: 80         │
-    └──────┬──────┬───────┘
-           │      │   nginx actúa como API Gateway
-           │      │   proxy_pass por ruta
-           │      │
-    ┌──────▼──┐  ┌▼────────────┐
-    │  EC2:   │  │  EC2:       │   IPs estáticas (Elastic IPs)
-    │  Medical│  │  Specialties│
-    │ Services│  │  Service    │
-    │ (Ubuntu)│  │  (Ubuntu)   │
-    │ Docker: │  │  Docker:    │
-    │ Express │  │  Express    │
-    │ :3001   │  │  :3002      │
-    └────┬────┘  └──────┬──────┘
-         │               │
-    ┌────▼────┐    ┌─────▼─────┐
-    │  RDS    │    │  RDS      │   Subnets Privadas
-    │ Postgres│    │ Postgres  │   (sin acceso público)
-    │ medical │    │specialties│
-    │ _svcs DB│    │    DB     │
-    └─────────┘    └───────────┘
-```
+![alt text](<Diagrama sin título.jpg>)
 
 ---
 
 ## Arquitectura de Capas (Two-Tier Microservices)
 
-```
-┌────────────────────────────────────────────────────┐
-│  CAPA DE PRESENTACIÓN (Layer 1)                    │
-│  Vue.js SPA — nginx Docker Container               │
-│  • Consume /api/servicios y /api/especialidades    │
-│  • nginx enruta como API Gateway interno           │
-└────────────────────────────────────────────────────┘
-                        │
-┌────────────────────────────────────────────────────┐
-│  CAPA DE LÓGICA DE NEGOCIO (Layer 2)               │
-│  Microservicio A          Microservicio B          │
-│  Medical Services         Specialties              │
-│  Express.js :3001         Express.js :3002         │
-│  • GET/POST/PUT/DELETE    • GET/POST/PUT/DELETE     │
-│    /api/servicios           /api/especialidades     │
-└────────────────────────────────────────────────────┘
-                        │
-┌────────────────────────────────────────────────────┐
-│  CAPA DE PERSISTENCIA (Layer 3)                    │
-│  AWS RDS PostgreSQL 15    AWS RDS PostgreSQL 15    │
-│  DB: medical_services     DB: specialties          │
-│  (Managed Database —      (Managed Database —      │
-│   sin acceso público)      sin acceso público)     │
-└────────────────────────────────────────────────────┘
-```
+![alt text](<Diagrama sin título (1).jpg>)
 
 ---
 
 ## Infraestructura Terraform (Recursos AWS)
 
-| Recurso AWS | Nombre | Descripción |
+| Recurso AWS | Nombre | Especificación Real |
 |---|---|---|
-| `aws_vpc` | ayd-vpc | Red virtual privada `10.0.0.0/16` |
-| `aws_subnet` (×4) | public-a/b, private-a/b | Subnets públicas (EC2/ALB) y privadas (RDS) |
-| `aws_internet_gateway` | ayd-igw | Salida a Internet |
-| `aws_lb` | ayd-alb | Application Load Balancer (punto de entrada) |
-| `aws_instance` (×3) | frontend, medical-services, specialties | EC2 Ubuntu 22.04 t3.micro |
-| `aws_eip` (×3) | frontend-eip, medical-eip, specialties-eip | IPs públicas estáticas |
-| `aws_db_instance` (×2) | medical-db, specialties-db | RDS PostgreSQL 15 db.t3.micro |
-| `aws_ecr_repository` (×3) | ayd-frontend, ayd-medical-services, ayd-specialties | Registro de contenedores |
+| `aws_vpc` | ayd-vpc | CIDR `10.0.0.0/16` en región `us-east-1` |
+| `aws_subnet` (×4) | public-a/b, private-a/b | 2 públicas (AZ: us-east-1a, 1b) para EC2/ALB; 2 privadas para RDS |
+| `aws_internet_gateway` | ayd-igw | Salida a Internet (attached a ayd-vpc) |
+| `aws_lb` | ayd-alb | Application Load Balancer · DNS: `ayd-alb-869063827.us-east-1.elb.amazonaws.com` |
+| `aws_instance` (×3) | frontend, medical-services, specialties | **EC2 Ubuntu 22.04 LTS · t3.micro · EBS gp3 20GB** |
+| `aws_eip` (×3) | frontend-eip, medical-eip, specialties-eip | **IPs Elásticas Públicas:** `35.170.34.144` \| `35.171.99.113` \| `3.209.5.159` |
+| `aws_db_instance` (×2) | ayd-medical-db, ayd-specialties-db | **PostgreSQL 15.7** · Instancia `db.t3.micro` · 20GB gp2 · **No público** |
+| `aws_db_subnet_group` | ayd-db-subnet-group | Reside en subnets privadas (disponibilidad multi-AZ) |
+| `aws_ecr_repository` (×3) | ayd-frontend, ayd-medical-services, ayd-specialties | Registros privados ECR para almacenar imágenes Docker |
 | `aws_iam_role` | ayd-ec2-ecr-role | Permite a EC2 leer desde ECR sin credenciales manuales |
-| `aws_security_group` (×6) | alb, frontend, medical, specialties, rds-medical, rds-specialties | Reglas de red por capa |
+| `aws_security_group` (×6) | alb, frontend, medical, specialties, rds-medical, rds-specialties | Reglas de firewall por capá (aislamiento de tráfico) |
 
 ---
 
