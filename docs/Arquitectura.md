@@ -29,7 +29,7 @@
 | `aws_db_subnet_group` | ayd-db-subnet-group | Reside en subnets privadas (disponibilidad multi-AZ) |
 | `aws_ecr_repository` (×3) | ayd-frontend, ayd-medical-services, ayd-specialties | Registros privados ECR para almacenar imágenes Docker |
 | `aws_iam_role` | ayd-ec2-ecr-role | Permite a EC2 leer desde ECR sin credenciales manuales |
-| `aws_security_group` (×6) | alb, frontend, medical, specialties, rds-medical, rds-specialties | Reglas de firewall por capá (aislamiento de tráfico) |
+| `aws_security_group` (×6) | alb, frontend, medical, specialties, rds-medical, rds-specialties | Reglas de firewall por capa (aislamiento de tráfico) |
 
 ---
 
