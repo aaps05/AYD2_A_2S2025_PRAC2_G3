@@ -1,0 +1,158 @@
+name: CI/CD — Build & Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: "1.9.8"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 1: Build Docker images and push to ECR
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-push:
+    name: Build & Push images to ECR
+    runs-on: ubuntu-latest
+
+    outputs:
+      ecr_frontend_url: ${{ steps.tf.outputs.ecr_frontend_url }}
+      ecr_medical_services_url: ${{ steps.tf.outputs.ecr_medical_services_url }}
+      ecr_specialties_url: ${{ steps.tf.outputs.ecr_specialties_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init (read state from S3)
+        working-directory: terraform
+        run: terraform init
+
+      - name: Read ECR URLs from Terraform outputs
+        id: tf
+        working-directory: terraform
+        run: |
+          echo "ecr_frontend_url=$(terraform output -raw ecr_frontend_url)" >> $GITHUB_OUTPUT
+          echo "ecr_medical_services_url=$(terraform output -raw ecr_medical_services_url)" >> $GITHUB_OUTPUT
+          echo "ecr_specialties_url=$(terraform output -raw ecr_specialties_url)" >> $GITHUB_OUTPUT
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push Frontend image
+        run: |
+          docker build -t ${{ steps.tf.outputs.ecr_frontend_url }}:latest ./frontend
+          docker push ${{ steps.tf.outputs.ecr_frontend_url }}:latest
+
+      - name: Build & push Medical Services image
+        run: |
+          docker build -t ${{ steps.tf.outputs.ecr_medical_services_url }}:latest ./backend/medical-services
+          docker push ${{ steps.tf.outputs.ecr_medical_services_url }}:latest
+
+      - name: Build & push Specialties image
+        run: |
+          docker build -t ${{ steps.tf.outputs.ecr_specialties_url }}:latest ./backend/specialties
+          docker push ${{ steps.tf.outputs.ecr_specialties_url }}:latest
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 2: Deploy containers to EC2 via Ansible
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy with Ansible
+    runs-on: ubuntu-latest
+    needs: build-push
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init & export all outputs as env vars
+        working-directory: terraform
+        run: |
+          terraform init
+
+          echo "FRONTEND_IP=$(terraform output -raw frontend_eip)"                             >> $GITHUB_ENV
+          echo "MEDICAL_IP=$(terraform output -raw medical_services_eip)"                      >> $GITHUB_ENV
+          echo "SPECIALTIES_IP=$(terraform output -raw specialties_eip)"                       >> $GITHUB_ENV
+          echo "ECR_FRONTEND_URL=$(terraform output -raw ecr_frontend_url)"                    >> $GITHUB_ENV
+          echo "ECR_MEDICAL_SERVICES_URL=$(terraform output -raw ecr_medical_services_url)"    >> $GITHUB_ENV
+          echo "ECR_SPECIALTIES_URL=$(terraform output -raw ecr_specialties_url)"              >> $GITHUB_ENV
+          echo "MEDICAL_SERVICES_DB_HOST=$(terraform output -raw medical_services_db_host)"    >> $GITHUB_ENV
+          echo "SPECIALTIES_DB_HOST=$(terraform output -raw specialties_db_host)"              >> $GITHUB_ENV
+          echo "MEDICAL_SERVICES_PRIVATE_IP=$(terraform output -raw medical_services_private_ip)" >> $GITHUB_ENV
+          echo "SPECIALTIES_PRIVATE_IP=$(terraform output -raw specialties_private_ip)"        >> $GITHUB_ENV
+
+      - name: Write EC2 SSH private key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/ayd-keypair.pem
+          chmod 600 ~/.ssh/ayd-keypair.pem
+
+      - name: Generate Ansible inventory from Terraform outputs
+        run: |
+          cat > ansible/inventory/hosts.yml <<EOF
+          all:
+            children:
+              frontend:
+                hosts:
+                  frontend-server:
+                    ansible_host: ${FRONTEND_IP}
+              medical_services:
+                hosts:
+                  medical-services-server:
+                    ansible_host: ${MEDICAL_IP}
+              specialties:
+                hosts:
+                  specialties-server:
+                    ansible_host: ${SPECIALTIES_IP}
+          EOF
+
+      - name: Install Ansible & Docker collection
+        run: |
+          pip install --quiet ansible
+          ansible-galaxy collection install -r ansible/requirements.yml
+
+      - name: Run Ansible — install Docker + deploy containers
+        working-directory: ansible
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          ECR_FRONTEND_URL: ${{ env.ECR_FRONTEND_URL }}
+          ECR_MEDICAL_SERVICES_URL: ${{ env.ECR_MEDICAL_SERVICES_URL }}
+          ECR_SPECIALTIES_URL: ${{ env.ECR_SPECIALTIES_URL }}
+          MEDICAL_SERVICES_DB_HOST: ${{ env.MEDICAL_SERVICES_DB_HOST }}
+          SPECIALTIES_DB_HOST: ${{ env.SPECIALTIES_DB_HOST }}
+          MEDICAL_SERVICES_PRIVATE_IP: ${{ env.MEDICAL_SERVICES_PRIVATE_IP }}
+          SPECIALTIES_PRIVATE_IP: ${{ env.SPECIALTIES_PRIVATE_IP }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+        run: ansible-playbook playbooks/site.yml

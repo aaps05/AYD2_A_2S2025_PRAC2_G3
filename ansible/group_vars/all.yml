@@ -1,0 +1,15 @@
+aws_region: "{{ lookup('env', 'AWS_REGION') | default('us-east-1', true) }}"
+
+ecr_frontend_url:        "{{ lookup('env', 'ECR_FRONTEND_URL') }}"
+ecr_medical_services_url: "{{ lookup('env', 'ECR_MEDICAL_SERVICES_URL') }}"
+ecr_specialties_url:     "{{ lookup('env', 'ECR_SPECIALTIES_URL') }}"
+
+medical_services_db_host: "{{ lookup('env', 'MEDICAL_SERVICES_DB_HOST') }}"
+specialties_db_host:      "{{ lookup('env', 'SPECIALTIES_DB_HOST') }}"
+db_password:              "{{ lookup('env', 'DB_PASSWORD') }}"
+admin_email:              "{{ lookup('env', 'ADMIN_EMAIL') | default('admin@ayd.local', true) }}"
+admin_password:           "{{ lookup('env', 'ADMIN_PASSWORD') | default('Admin123!', true) }}"
+admin_token:              "{{ lookup('env', 'ADMIN_TOKEN') | default('ayd-admin-token', true) }}"
+
+medical_services_private_ip: "{{ lookup('env', 'MEDICAL_SERVICES_PRIVATE_IP') }}"
+specialties_private_ip:      "{{ lookup('env', 'SPECIALTIES_PRIVATE_IP') }}"

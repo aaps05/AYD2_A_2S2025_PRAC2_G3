@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  postgres-medical:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: medical_services
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: localpassword
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata-medical:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-specialties:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: specialties
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: localpassword
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata-specialties:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  medical-services:
+    build: ./backend/medical-services
+    ports:
+      - "3001:3001"
+    environment:
+      DB_HOST: postgres-medical
+      DB_PORT: 5432
+      DB_NAME: medical_services
+      DB_USER: postgres
+      DB_PASSWORD: localpassword
+      DB_SSL: "false"
+      ADMIN_EMAIL: admin@ayd.local
+      ADMIN_PASSWORD: Admin123!
+      ADMIN_TOKEN: local-admin-token
+      PORT: 3001
+    depends_on:
+      postgres-medical:
+        condition: service_healthy
+
+  specialties:
+    build: ./backend/specialties
+    ports:
+      - "3002:3002"
+    environment:
+      DB_HOST: postgres-specialties
+      DB_PORT: 5432
+      DB_NAME: specialties
+      DB_USER: postgres
+      DB_PASSWORD: localpassword
+      DB_SSL: "false"
+      ADMIN_TOKEN: local-admin-token
+      PORT: 3002
+    depends_on:
+      postgres-specialties:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    environment:
+      MEDICAL_SERVICES_HOST: medical-services
+      SPECIALTIES_HOST: specialties
+    depends_on:
+      - medical-services
+      - specialties
+
+volumes:
+  pgdata-medical:
+  pgdata-specialties:
