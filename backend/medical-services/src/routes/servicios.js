@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../db');
+const { requireAdmin } = require('../auth');
 
 const router = express.Router();
 
@@ -27,7 +28,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const { nombre, descripcion_tecnica, requisitos_previos, precio, disponible } = req.body;
   if (!nombre || precio === undefined) {
     return res.status(400).json({ error: 'nombre y precio son requeridos' });
@@ -44,7 +45,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
   const { nombre, descripcion_tecnica, requisitos_previos, precio, disponible } = req.body;
   try {
     const { rows } = await pool.query(
@@ -60,7 +61,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(
       'DELETE FROM servicios_medicos WHERE id=$1 RETURNING *',

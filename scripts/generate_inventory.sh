@@ -60,7 +60,7 @@ specialties_private_ip: "${SPECIALTIES_PRIVATE_IP}"
 EOF
 
 echo ""
-echo "✅ Inventory written. Environment variables exported:"
+echo "   Inventory written. Environment variables exported:"
 echo "   ECR_FRONTEND_URL=${ECR_FRONTEND_URL}"
 echo "   ECR_MEDICAL_SERVICES_URL=${ECR_MEDICAL_SERVICES_URL}"
 echo "   ECR_SPECIALTIES_URL=${ECR_SPECIALTIES_URL}"

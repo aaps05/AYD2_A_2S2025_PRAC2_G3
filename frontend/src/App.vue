@@ -8,8 +8,8 @@
           <h1>Centro Médico AYD</h1>
           <p>Catálogo de Servicios y Procedimientos Médicos</p>
         </div>
-        <button class="btn-admin" :class="{ active: adminMode }" @click="adminMode = !adminMode">
-          {{ adminMode ? 'Salir del modo admin' : 'Modo Admin' }}
+        <button class="btn-admin" :class="{ active: adminMode }" @click="handleAdminButton">
+          {{ adminMode ? 'Cerrar sesión admin' : 'Ingresar como admin' }}
         </button>
       </div>
     </header>
@@ -108,6 +108,28 @@
       <p>© 2026 Centro Médico AYD · Análisis y Diseño de Sistemas 2 · USAC</p>
     </footer>
 
+    <!-- ── Modal Login Admin ───────────────────────────────────────────────── -->
+    <div v-if="loginModal.open" class="overlay" @click.self="loginModal.open = false">
+      <div class="modal login-modal">
+        <h3>Ingreso de administrador</h3>
+        <form @submit.prevent="submitAdminLogin">
+          <label>Correo
+            <input v-model.trim="loginForm.email" type="email" required placeholder="admin@ayd.local" autocomplete="username" />
+          </label>
+          <label>Contraseña
+            <input v-model="loginForm.password" type="password" required placeholder="Contraseña" autocomplete="current-password" />
+          </label>
+          <p v-if="loginError" class="login-error">{{ loginError }}</p>
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" @click="loginModal.open = false">Cancelar</button>
+            <button type="submit" class="btn-save" :disabled="saving">
+              {{ saving ? 'Validando...' : 'Ingresar' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- ── Modal Servicio ──────────────────────────────────────────────────── -->
     <div v-if="svcModal.open" class="overlay" @click.self="svcModal.open = false">
       <div class="modal">
@@ -195,6 +217,7 @@ import {
   getServicios, getEspecialidades,
   createServicio, updateServicio, deleteServicio,
   createEspecialidad, updateEspecialidad, deleteEspecialidad,
+  loginAdmin, getAdminToken, clearAdminToken,
 } from './services/api.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -203,7 +226,7 @@ const especialidades = ref([]);
 const selectedId     = ref(null);
 const loading        = ref(true);
 const error          = ref(null);
-const adminMode      = ref(false);
+const adminMode      = ref(Boolean(getAdminToken()));
 const saving         = ref(false);
 const toast          = ref(null);
 const deleteTarget   = ref(null);
@@ -214,6 +237,10 @@ const svcForm  = reactive({ nombre: '', descripcion_tecnica: '', requisitos_prev
 
 const espModal = reactive({ open: false, editing: false, id: null });
 const espForm  = reactive({ nombre: '', descripcion: '', servicios: [] });
+
+const loginModal = reactive({ open: false });
+const loginForm = reactive({ email: '', password: '' });
+const loginError = ref('');
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const ICONS = { 'Cardiología': '❤️', 'Pediatría': '👶', 'Laboratorio Clínico': '🧪', 'Neurología': '🧠', 'Traumatología': '🦴' };
@@ -250,6 +277,39 @@ onMounted(fetchData);
 function showToast(msg, type = 'success') {
   toast.value = { msg, type };
   setTimeout(() => { toast.value = null; }, 3000);
+}
+
+// ── Admin Auth ───────────────────────────────────────────────────────────────
+function handleAdminButton() {
+  if (adminMode.value) {
+    clearAdminToken();
+    adminMode.value = false;
+    svcModal.open = false;
+    espModal.open = false;
+    deleteTarget.value = null;
+    showToast('Sesión de administrador cerrada');
+    return;
+  }
+
+  loginError.value = '';
+  Object.assign(loginForm, { email: '', password: '' });
+  loginModal.open = true;
+}
+
+async function submitAdminLogin() {
+  saving.value = true;
+  loginError.value = '';
+
+  try {
+    await loginAdmin({ ...loginForm });
+    adminMode.value = true;
+    loginModal.open = false;
+    showToast('Modo administrador activado');
+  } catch {
+    loginError.value = 'Correo o contraseña incorrectos.';
+  } finally {
+    saving.value = false;
+  }
 }
 
 // ── Servicio Modal ────────────────────────────────────────────────────────────
@@ -538,6 +598,8 @@ body {
 .modal form { display: flex; flex-direction: column; gap: 0.9rem; }
 .modal label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; font-weight: 600; color: #4a5568; }
 .modal input[type="text"],
+.modal input[type="email"],
+.modal input[type="password"],
 .modal input[type="number"],
 .modal textarea {
   padding: 0.55rem 0.75rem; border: 1.5px solid #d0d9e6; border-radius: 7px;
@@ -549,6 +611,8 @@ body {
 .inline-check { flex-direction: row !important; align-items: center; gap: 0.5rem !important; font-weight: normal !important; }
 .inline-check.small { font-size: 0.82rem; }
 .service-checks { display: flex; flex-direction: column; gap: 0.35rem; max-height: 180px; overflow-y: auto; padding: 0.5rem; border: 1.5px solid #d0d9e6; border-radius: 7px; }
+.login-modal { max-width: 420px; }
+.login-error { color: #c62828; font-size: 0.85rem; background: #fce4ec; padding: 0.5rem 0.75rem; border-radius: 7px; }
 
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem; }
 .btn-cancel {

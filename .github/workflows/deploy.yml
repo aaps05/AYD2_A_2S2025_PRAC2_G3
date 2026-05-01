@@ -152,4 +152,7 @@ jobs:
           MEDICAL_SERVICES_PRIVATE_IP: ${{ env.MEDICAL_SERVICES_PRIVATE_IP }}
           SPECIALTIES_PRIVATE_IP: ${{ env.SPECIALTIES_PRIVATE_IP }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
         run: ansible-playbook playbooks/site.yml

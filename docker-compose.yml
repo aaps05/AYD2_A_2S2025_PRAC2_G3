@@ -44,6 +44,9 @@ services:
       DB_USER: postgres
       DB_PASSWORD: localpassword
       DB_SSL: "false"
+      ADMIN_EMAIL: admin@ayd.local
+      ADMIN_PASSWORD: Admin123!
+      ADMIN_TOKEN: local-admin-token
       PORT: 3001
     depends_on:
       postgres-medical:
@@ -60,6 +63,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: localpassword
       DB_SSL: "false"
+      ADMIN_TOKEN: local-admin-token
       PORT: 3002
     depends_on:
       postgres-specialties:

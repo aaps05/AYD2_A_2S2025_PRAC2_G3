@@ -40,6 +40,9 @@
           DB_USER: "postgres"
           DB_PASSWORD: "{{ db_password }}"
           DB_SSL: "true"
+          ADMIN_EMAIL: "{{ admin_email | default('admin@ayd.local') }}"
+          ADMIN_PASSWORD: "{{ admin_password | default('Admin123!') }}"
+          ADMIN_TOKEN: "{{ admin_token | default('ayd-admin-token') }}"
           PORT: "3001"
 
 # ─── Specialties ──────────────────────────────────────────────────────────────
@@ -83,6 +86,7 @@
           DB_USER: "postgres"
           DB_PASSWORD: "{{ db_password }}"
           DB_SSL: "true"
+          ADMIN_TOKEN: "{{ admin_token | default('ayd-admin-token') }}"
           PORT: "3002"
 
 # ─── Frontend ─────────────────────────────────────────────────────────────────
